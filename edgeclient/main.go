@@ -4365,6 +4365,7 @@ func createCollapsibleDeviceList() fyne.CanvasObject {
 					
 				}
 			} else {
+				ci.addBtn.Hide()
 				// 设备项处理
 				if selectedDevice == item.Device.IP {
 					ci.icon.SetResource(theme.ConfirmIcon())
