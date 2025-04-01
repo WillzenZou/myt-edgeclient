@@ -1494,7 +1494,7 @@ func handleAPKInstall(item *TaskItem, ip string, uploadPort int, containerID str
 
 func openSharedFolder() {
 	SharedDirPath := getConfigPath("shared")
-	fmt.Println("共享目录", SharedDirPath)
+	//fmt.Println("共享目录", SharedDirPath)
     // 确保文件夹存在
     if _, err := os.Stat(SharedDirPath); os.IsNotExist(err) {
         if err := os.MkdirAll(SharedDirPath, 0777); err != nil {
@@ -1976,7 +1976,7 @@ func startProjection(deviceIP string, info *ContainerInfo) {
     default:
         screenexe = "./screen"
     }
-    fmt.Println("启动 ./screen ", screenexe, args)
+    //fmt.Println("启动 ./screen ", screenexe, args)
     // 启动进程
     cmd := exec.Command(screenexe, args...)
     if err := cmd.Start(); err != nil {
@@ -3359,10 +3359,12 @@ func createHostCheckList(currentDevice DeviceInfo) fyne.CanvasObject {
 
     // 初始化设备列表
     tempFilteredDevices := refreshHostList(currentDeviceType, currentDevice.IP)
+    // 搜索过滤列表
+	searchFilteredDevices := tempFilteredDevices
 
     // 设备列表组件
     hostList := widget.NewList(
-        func() int { return len(tempFilteredDevices) },
+        func() int { return len(searchFilteredDevices) },
         func() fyne.CanvasObject {
             return container.NewHBox(
                 widget.NewCheck("", nil),
@@ -3370,7 +3372,7 @@ func createHostCheckList(currentDevice DeviceInfo) fyne.CanvasObject {
             )
         },
         func(i widget.ListItemID, o fyne.CanvasObject) {
-            device := tempFilteredDevices[i]
+            device := searchFilteredDevices[i]
             cont := o.(*fyne.Container)
             check := cont.Objects[0].(*widget.Check)
             label := cont.Objects[1].(*widget.Label)
@@ -3397,7 +3399,26 @@ func createHostCheckList(currentDevice DeviceInfo) fyne.CanvasObject {
             label.SetText(fmt.Sprintf("%s (%s)", device.IP, device.Name))
         },
     )
-    listcontainer := container.NewVBox(selectedCountLabel, container.NewGridWrap(fyne.NewSize(400, 150), hostList))
+    
+    searchEntry := widget.NewEntry()
+	searchEntry.SetPlaceHolder("搜索设备...")
+	searchEntry.OnChanged = func(filter string) {
+		searchFilteredDevices = nil
+		for _, d := range tempFilteredDevices {
+			if strings.Contains(d.IP, filter) || 
+			   strings.Contains(d.Name, filter) || 
+			   strings.Contains(d.Type, filter) {
+				searchFilteredDevices = append(searchFilteredDevices, d)
+			}
+		}
+		hostList.Refresh()
+	}
+    
+    listcontainer := container.NewVBox(
+		selectedCountLabel,
+		searchEntry,
+		container.NewGridWrap(fyne.NewSize(400, 150), hostList),
+	)
 
     updateSelectedCount()
     return listcontainer
@@ -4348,7 +4369,7 @@ func createCollapsibleDeviceList() fyne.CanvasObject {
 			if item.IsGroup {
 				ci.addBtn.Show()
 				ci.addBtn.OnTapped = func() {
-					fmt.Println("点击了添加分组",item.Group.ID)
+					//fmt.Println("点击了添加分组",item.Group.ID)
 					addDevice2Groups(item.Group.ID)
 				}
 				// 分组项处理
@@ -4548,9 +4569,11 @@ func addDevice2Groups(existingGroupID string) {
     for _, devID := range targetGroup.Devices {
         selectedDevices[devID] = true
     }
+	
+	searchFilteredDevices := savedDevices
 
     list := widget.NewList(
-        func() int { return len(savedDevices) },
+        func() int { return len(searchFilteredDevices) },
         func() fyne.CanvasObject {
             return container.NewHBox(
                 widget.NewCheck("", nil),
@@ -4558,7 +4581,7 @@ func addDevice2Groups(existingGroupID string) {
             )
         },
         func(i widget.ListItemID, o fyne.CanvasObject) {
-            device := savedDevices[i]
+            device := searchFilteredDevices[i]
             cont := o.(*fyne.Container)
             check := cont.Objects[0].(*widget.Check)
             label := cont.Objects[1].(*widget.Label)
@@ -4574,12 +4597,29 @@ func addDevice2Groups(existingGroupID string) {
             label.SetText(fmt.Sprintf("%s (%s)", device.IP, device.Name))
         },
     )
+    
+	searchEntry := widget.NewEntry()
+	searchEntry.SetPlaceHolder("搜索设备...")
+	searchEntry.OnChanged = func(filter string) {
+		searchFilteredDevices = nil
+		for _, d := range savedDevices {
+			if strings.Contains(d.IP, filter) || 
+			   strings.Contains(d.Name, filter) || 
+			   strings.Contains(d.Type, filter) {
+				searchFilteredDevices = append(searchFilteredDevices, d)
+			}
+		}
+		list.Refresh()
+	}
 
     dialog.ShowCustomConfirm(
         "管理分组设备", 
         "保存", 
         "取消",
-        container.NewVScroll(list),
+        container.NewVBox(
+			searchEntry,
+			container.NewGridWrap(fyne.NewSize(400, 150), list),
+		),
         func(confirm bool) {
             if confirm && targetGroup != nil {
                 // 生成新的设备列表
